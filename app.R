@@ -1,4 +1,3 @@
-
 library(tidyverse)
 library(shiny)
 library(ggplot2)
@@ -46,7 +45,6 @@ ui <- fluidPage(
   )
 )
 
-
 server <- function(input, output) {
   output$description <- renderPrint({
     description <- switch(input$data_column,
@@ -87,6 +85,5 @@ server <- function(input, output) {
     ggplotly(p)
   })
 }
-
 
 shinyApp(ui, server)
