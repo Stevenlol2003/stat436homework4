@@ -1,0 +1,108 @@
+---
+title: "Homework 4"
+output: html_document
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+```
+
+```{r, echo=FALSE}
+library(tidyverse)
+library(shiny)
+library(ggplot2)
+library(dplyr)
+library(plotly)
+library(countrycode)
+theme_set(theme_bw())
+```
+
+```{r}
+data = read_csv("https://uwmadison.box.com/shared/static/ni36m8upor79n1ij1wgjblcslkasbm5c.csv")
+data = data %>% 
+  filter(Code != "Region" & Code != "OWID_WRL" & Code != "OWID_KOS")
+data
+
+get_region_name = function(code) {
+  countrycode(code, origin = "iso3c", destination = "continent")
+}
+
+# rename country name column and add region column
+data_with_region = data %>%
+  rename(Country = Entity) %>%
+  mutate(Region = get_region_name(Code), .after = Code)
+```
+
+```{r}
+ui <- fluidPage(
+  titlePanel("Internet Access Over Time"),
+  fluidRow(
+    column(6,
+           selectInput("regions", "Select Region:", 
+                       choices = unique(data_with_region$Region), 
+                       selected = "Americas"),
+           selectInput("data_column", "Select Data Column:", 
+                       choices = c("Cellular Subscription", "Internet Users(%)", "No. of Internet Users", "Broadband Subscription"))
+    ),
+    column(6,
+           selectInput("optional_region", "Select Optional Region:", 
+                       choices = c("None", unique(data_with_region$Region)), 
+                       selected = "None")
+    )
+  ),
+  fluidRow(
+    column(6, plotlyOutput("scatterplot_1")), 
+    column(6, plotlyOutput("scatterplot_2")),
+  ),
+  fluidRow(
+    column(12, textOutput("description"))
+  )
+)
+
+
+server <- function(input, output) {
+  output$description <- renderPrint({
+    description <- switch(input$data_column,
+                          "Cellular Subscription" = "Mobile phone subscriptions per 100 people. This number can get over 100 when the  average person has more than one subscription to a mobile service.",
+                          "Internet Users(%)" = "The share of the population that is accessing the internet for all countries of the world.",
+                          "No. of Internet Users" = "Number of people using the Internet in every country.",
+                          "Broadband Subscription" = "The number of fixed broadband subscriptions per 100 people. This refers to fixed subscriptions to high-speed access to the public Internet (a TCP/IP connection), at downstream speeds equal to, or greater than, 256 kbit/s.")
+    description
+  })  
+  
+  output$scatterplot_1 <- renderPlotly({
+    filtered_data <- data_with_region %>%
+      filter(Region %in% input$regions)
+    
+    p <- ggplot(filtered_data, aes(x = Year, y = !!sym(input$data_column), color = Country)) +
+      geom_point() +
+      geom_line() +
+      labs(x = "Year", y = input$data_column, color = "Country") +
+      theme_minimal() +
+      theme(legend.position = "bottom")  # Set legend position at the bottom
+    
+    ggplotly(p)
+  })
+  
+  output$scatterplot_2 <- renderPlotly({
+    req(input$optional_region != "None")
+    
+    filtered_data <- data_with_region %>%
+      filter(Region == input$optional_region)
+    
+    p <- ggplot(filtered_data, aes(x = Year, y = !!sym(input$data_column), color = Country)) +
+      geom_point() +
+      geom_line() +
+      labs(x = "Year", y = input$data_column, color = "Country") +
+      theme_minimal() +
+      theme(legend.position = "bottom")  # Set legend position at the bottom
+    
+    ggplotly(p)
+  })
+}
+
+
+shinyApp(ui, server)
+```
+
